@@ -44,7 +44,7 @@ export function buildArena(participantCount: number, radius = 1): Arena {
 }
 
 function buildTwoParticipantArena(radius: number): Arena {
-  const half = radius * 0.45;
+  const half = radius;
   const topRight: Vec2 = { x: half, y: -radius };
   const bottomRight: Vec2 = { x: half, y: radius };
   const bottomLeft: Vec2 = { x: -half, y: radius };
