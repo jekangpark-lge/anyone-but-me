@@ -1,0 +1,3 @@
+- `components/game/useMatchSession.ts:65` planRound()의 실패(모든 시도 후에도 시작조건을 못 찾는 경우)가 `.catch` 없이 던져져, 발생 시 로딩 화면에 영구히 멈춘다. 실측 성공률(시도당 20~40%, 400회 시도) 상 발생 가능성은 매우 낮음.
+- `lib/game/setup.ts:43` `participantColors` 헬퍼가 어디서도 호출되지 않고, 같은 로직(`palette[p.colorIndex]`)이 ArenaView/ResultsScreen/SetupScreen 세 곳에 인라인으로 중복되어 있다. 헬퍼를 실제로 연결하거나 삭제할 것.
+- `lib/game/random.ts:22` `randomInt`가 export만 되어 있고 실제 호출부가 없다.
