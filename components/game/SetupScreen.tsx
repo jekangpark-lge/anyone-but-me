@@ -42,11 +42,11 @@ export function SetupScreen({
     <div className="flex flex-1 flex-col items-center gap-6 px-6 py-10">
       <h1 className="text-xl font-semibold">게임 준비</h1>
 
-      <div className="flex gap-6">
-        <label className="flex flex-col gap-1 text-sm">
-          참가자 인원수
+      <div className="flex w-72 items-center justify-center gap-3 text-sm">
+        <label className="flex items-center gap-2">
+          참가자
           <select
-            className="rounded-md border border-input bg-background px-2 py-1"
+            className="w-20 rounded-md border border-input bg-background px-2 py-1"
             value={participants.length}
             onChange={(e) => handleCountChange(Number(e.target.value))}
           >
@@ -61,10 +61,12 @@ export function SetupScreen({
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          당첨자 수
+        <div className="h-6 w-px shrink-0 bg-border" />
+
+        <label className="flex items-center gap-2">
+          당첨자
           <select
-            className="rounded-md border border-input bg-background px-2 py-1"
+            className="w-20 rounded-md border border-input bg-background px-2 py-1"
             value={winnersCount}
             onChange={(e) => onChangeWinnersCount(Number(e.target.value))}
           >
@@ -77,7 +79,7 @@ export function SetupScreen({
         </label>
       </div>
 
-      <ul className="flex w-full max-w-sm flex-col gap-3">
+      <ul className="flex w-72 flex-col gap-3">
         {participants.map((p, i) => (
           <li key={p.id} className="flex items-center gap-3">
             <button
@@ -99,7 +101,7 @@ export function SetupScreen({
         ))}
       </ul>
 
-      <Button size="lg" onClick={onSubmit}>
+      <Button size="lg" className="w-72" onClick={onSubmit}>
         게임 시작
       </Button>
     </div>
