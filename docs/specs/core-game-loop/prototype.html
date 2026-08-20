@@ -1,0 +1,647 @@
+<!--
+  prototype shell: the review chrome every prototype starts from.
+
+  Keep this comment in the prototype you grow from here: it is the contract,
+  and later turns work from that file rather than from this one.
+
+  Contract (extend product screens; keep the review shell):
+  - Product:  .sh-stage contains only end-user product UI. Keep review notes,
+               rationale, instructions, and approval controls in conversation.
+  - Screens:  <section data-screen="slug" data-title="Label"> inside .sh-stage.
+               The selector, arrow keys, and #hash routing build themselves.
+               Use one option per product destination or distinct surface,
+               named by its product role. Keep baselines, variants, comparison
+               labels, steps, indexes, and progress out of names and states.
+               Links may use href="#slug".
+  - States:   "Default" is automatic. A screen declares only representative
+               presets in data-states="Empty,Error". Use natural, screen-specific
+               names. Reserve presets for important multi-step results, forced
+               data or errors, or materially different structure; keep one-click
+               and transient states as interactions. Use data-when="Empty" on
+               preset-only elements. Call prototypeShell.setState("Name") on
+               entry and setState("Default") on exit, including when repeated
+               actions cross a preset condition.
+  - Viewport: "vp (m)" cycles full / 390 / 768. The 390 preset is a
+               fixed-height, internally scrolling phone frame. Start a
+               mobile-first prototype by adding class="sh-vp-390" to <body>
+               (or a bootstrap classList.add before the chrome script runs).
+  - Pinning:  keep in-frame bars (tab bars, CTAs) inside the phone with
+               position: sticky; position: fixed pins to the browser window.
+  - Tokens:   replace the project-tokens block with project tokens copied
+               verbatim. Map differing names to --background, --foreground, and
+               --font afterwards; replace network fonts with a system stack and
+               note that substitution. Without a design system, keep this
+               palette as the finished style.
+  - Placeholders: .wf-pic stands in for pictures the prototype has no real
+               files for. Use real text everywhere text belongs.
+
+  - Chrome:   Keep exactly the screen selector, selected-screen state selector,
+               and viewport cycle. Chrome that needs explaining has failed.
+
+  Self-contained by design: no build, no framework, no network.
+
+  Project note: tokens below are copied verbatim from app/globals.css
+  (shadcn neutral theme, oklch). The project's fonts (Geist/Inter via
+  next/font/google) are self-hosted at build time and unavailable to this
+  standalone file, so --font substitutes a system sans-serif stack.
+-->
+<meta charset="utf-8">
+<title>핵심 게임 루프 프로토타입</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ── project tokens: copied verbatim from app/globals.css ── */
+  :root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --radius: 0.625rem;
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    /* mapping for the shell chrome + font substitution note above */
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  /* ── review chrome (sh-*): keep; extend product styles elsewhere ── */
+  * { box-sizing: border-box }
+  body {
+    margin: 0; padding: 0 0 40px;
+    background: var(--background, #f6f6f6); color: var(--foreground, #3a3a3a);
+    font-family: var(--font, system-ui, sans-serif);
+  }
+  .sh-bar {
+    position: sticky; top: 0; z-index: 999;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 8px 12px; background: #191a1c; color: #d7d7d7;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .sh-bar b, .sh-control-label { color: #8a8f98; font-weight: 500 }
+  .sh-control { display: inline-flex; gap: 5px; align-items: center }
+  .sh-bar button {
+    border: 1px solid #3a3d42; background: none; color: inherit;
+    font: inherit; padding: 2px 9px; border-radius: 99px; cursor: pointer;
+  }
+  .sh-bar select {
+    width: 170px; border: 1px solid #3a3d42; background: #232428; color: inherit;
+    font: inherit; padding: 3px 28px 3px 9px; border-radius: 7px; cursor: pointer;
+    color-scheme: dark;
+  }
+  #sh-screen { width: 190px }
+  .sh-bar button.on { background: #d7d7d7; color: #191a1c; border-color: #d7d7d7 }
+  .sh-spacer { flex: 1 }
+  .sh-stage { max-width: 960px; margin: 0 auto; padding: 12px 16px 0 }
+  [hidden] { display: none !important }
+
+  /* viewport presets */
+  .sh-vp-390 .sh-stage {
+    max-width: 390px; background: var(--background, #f6f6f6);
+    border: 10px solid #191a1c; border-radius: 28px;
+    padding: 16px 12px; height: min(844px, calc(100dvh - 52px));
+    overflow-y: auto; margin-top: 12px;
+  }
+  .sh-vp-768 .sh-stage {
+    max-width: 768px; border: 1px solid #c4c4c4; border-radius: 12px;
+    padding: 16px; margin-top: 12px;
+  }
+
+  /* placeholders */
+  .wf-pic  { border-radius: 4px; background:
+             repeating-linear-gradient(45deg, #e9e9e9, #e9e9e9 6px, #f2f2f2 6px, #f2f2f2 12px) }
+
+  /* ── product styles ── */
+  .screen-inner { max-width: 720px; margin: 0 auto; padding: 28px 4px 64px; }
+  .page-title { font-size: 20px; font-weight: 600; margin: 0 0 16px; letter-spacing: -0.01em; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 36px; padding: 0 16px; border-radius: var(--radius-md);
+    font-size: 14px; font-weight: 500; border: 1px solid transparent;
+    cursor: pointer; text-decoration: none; transition: background-color .15s, opacity .15s;
+  }
+  .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+  .btn-primary:hover { opacity: .85; }
+  .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-outline { background: var(--background); border-color: var(--border); color: var(--foreground); }
+  .btn-outline:hover { background: var(--muted); }
+  .btn-lg { height: 44px; padding: 0 28px; font-size: 15px; border-radius: var(--radius-md); }
+
+  .welcome-wrap { min-height: 58vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 26px; }
+  .welcome-title { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+  .welcome-sub { color: var(--muted-foreground); font-size: 15px; max-width: 420px; line-height: 1.7; margin: 10px auto 0; }
+
+  .card {
+    background: var(--card); color: var(--card-foreground); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 22px 22px 20px; width: fit-content; max-width: 100%; margin: 0 auto;
+  }
+  .count-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .count-label { font-size: 12.5px; color: var(--muted-foreground); white-space: nowrap; flex: none; }
+  .count-divider { width: 1px; height: 20px; background: var(--border); flex: none; margin: 0 2px; }
+  .count-row select {
+    width: 64px; height: 32px; border: 1px solid var(--input); border-radius: var(--radius-md);
+    padding: 0 6px; font-size: 13px; background: var(--background); color: var(--foreground); cursor: pointer; flex: none;
+  }
+  .count-row select:focus { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+  .participant-list { border-top: 1px solid var(--border); }
+  .participant-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .row-color-btn {
+    width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; flex: none;
+    font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; transition: border-color .15s, transform .1s;
+  }
+  .row-color-btn:hover { border-color: var(--foreground); }
+  .row-color-btn:active { transform: scale(.92); }
+  .row-name-input { height: 34px; border: 1px solid var(--input); border-radius: var(--radius-md); padding: 0 10px; font-size: 14px; background: var(--background); color: var(--foreground); width: 220px; flex: none; }
+  .row-name-input:focus { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .setup-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+
+  .match-wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; padding-top: 6px; }
+  .match-status { font-size: 13px; color: var(--muted-foreground); text-align: center; max-width: 420px; }
+  .arena-holder { position: relative; width: 100%; max-width: 560px; display: flex; justify-content: center; }
+  .arena-svg { width: 100%; }
+  .chip-list { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 520px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; border-radius: 999px; background: var(--muted); font-size: 13px; }
+  .chip.is-eliminated { opacity: .55; }
+  .chip-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+
+  .loading-overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    border-radius: var(--radius-lg);
+    background: rgba(255,255,255,0.85);
+    background: color-mix(in oklch, var(--background), transparent 12%);
+  }
+  .spinner { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--foreground); animation: sh-spin 0.8s linear infinite; }
+  @keyframes sh-spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 13px; color: var(--muted-foreground); margin: 0; }
+
+  .elim-toast {
+    position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+    background: var(--foreground); color: var(--background);
+    padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .result-title { font-size: 22px; font-weight: 600; margin: 4px 0 4px; }
+  .result-sub { color: var(--muted-foreground); font-size: 14px; margin: 0 0 24px; }
+  .order-list { list-style: none; padding: 0; margin: 0 0 22px; display: flex; flex-direction: column; gap: 8px; max-width: 420px; }
+  .order-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); }
+  .order-rank { width: 22px; height: 22px; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 500; flex: none; }
+  .order-name { font-weight: 500; }
+  .winner-callout { background: var(--secondary); border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 22px; max-width: 420px; }
+  .winner-callout strong { font-size: 13px; color: var(--secondary-foreground); }
+  .winner-callout p { margin: 6px 0 0; font-size: 15px; font-weight: 500; }
+  .survivors-line { font-size: 13px; color: var(--muted-foreground); margin-bottom: 28px; }
+  .result-actions { display: flex; gap: 10px; }
+</style>
+
+<header class="sh-bar">
+  <b>proto</b>
+  <label class="sh-control"><span class="sh-control-label">screen</span><select id="sh-screen"></select></label>
+  <span class="sh-spacer"></span>
+  <label class="sh-control"><span class="sh-control-label">state</span><select id="sh-state"></select></label>
+  <button id="sh-vp">vp: full (m)</button>
+</header>
+
+<main class="sh-stage">
+
+  <section data-screen="welcome" data-title="초기 화면">
+    <div class="screen-inner">
+      <div class="welcome-wrap">
+        <div>
+          <div class="welcome-title" data-component="new:WelcomeTitle">Anyone, but Me</div>
+          <p class="welcome-sub">간단한 내기의 당첨자를 정하는 미니게임</p>
+        </div>
+        <a class="btn btn-primary btn-lg" data-component="Button" href="#setup">시작하기</a>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen="setup" data-title="설정 화면">
+    <div class="screen-inner">
+      <h1 class="page-title" style="text-align: center;">게임 준비</h1>
+      <div class="card" data-component="new:SetupCard">
+        <div class="count-row">
+          <label class="count-label" for="participantCount">참가자</label>
+          <select id="participantCount"></select>
+          <span class="count-divider"></span>
+          <label class="count-label" for="winnerCount">당첨자</label>
+          <select id="winnerCount"></select>
+        </div>
+        <div class="participant-list" id="participantList" data-component="new:ParticipantRow"></div>
+        <div class="setup-actions">
+          <button class="btn btn-primary" data-component="Button" id="startGameBtn">게임 시작</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen="match" data-title="진행 화면" data-states="로딩,탈락 순간">
+    <div class="screen-inner">
+      <div class="match-wrap">
+        <p class="match-status" id="roundLabel" style="font-weight: 500;">1판째 진행 중</p>
+        <div class="arena-holder">
+          <div class="elim-toast" id="elimToast" hidden></div>
+          <svg class="arena-svg" viewBox="0 0 680 580" role="img" aria-label="참가자 수만큼 변을 가진 다각형 아레나, 꼭짓점마다 원형 골대가 있고 공 1개가 안에서 움직인다">
+            <title>다각형 아레나</title>
+
+            <g id="arenaGroup"></g>
+
+            <!-- 공 + 이동 궤적 (골대와 뚜렷이 구분되는 둥근 공 모양) -->
+            <path id="ballTrail" d="M340,320 Q325,310 310,300" fill="none" stroke="#8a8f98" stroke-width="2" stroke-dasharray="3 5"/>
+            <circle id="ball" cx="310" cy="300" r="12" fill="#FDF6E3" stroke="#2b2b2b" stroke-width="2.5"/>
+            <circle id="ballHighlight" cx="307" cy="297" r="3" fill="#ffffff" opacity="0.9"/>
+          </svg>
+          <div class="loading-overlay" data-when="로딩" hidden>
+            <div class="spinner"></div>
+            <p class="loading-text">다음 판을 준비하는 중입니다…</p>
+          </div>
+        </div>
+        <div class="chip-list">
+          <span class="chip" id="chip-0"><span class="chip-dot" style="background:#4E79A7"></span><span class="chip-name">지훈</span></span>
+          <span class="chip" id="chip-1"><span class="chip-dot" style="background:#F28E2B"></span><span class="chip-name">2</span></span>
+          <span class="chip" id="chip-2"><span class="chip-dot" style="background:#E15759"></span><span class="chip-name">서연</span></span>
+          <span class="chip" id="chip-3"><span class="chip-dot" style="background:#59A14F"></span><span class="chip-name">4</span></span>
+          <span class="chip" id="chip-4"><span class="chip-dot" style="background:#EDC948"></span><span class="chip-name">민준</span></span>
+          <span class="chip" id="chip-5"><span class="chip-dot" style="background:#B07AA1"></span><span class="chip-name">6</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen="result" data-title="결과 화면">
+    <div class="screen-inner">
+      <p class="result-title">게임 종료</p>
+      <p class="result-sub">6명 중 2명이 당첨자로 정해졌습니다.</p>
+      <ol class="order-list">
+        <li class="order-item"><span class="order-rank">1</span><span class="chip-dot" style="background:#E15759"></span><span class="order-name">서연</span></li>
+        <li class="order-item"><span class="order-rank">2</span><span class="chip-dot" style="background:#B07AA1"></span><span class="order-name">6</span></li>
+      </ol>
+      <div class="winner-callout">
+        <strong>최종 당첨자</strong>
+        <p>서연, 6</p>
+      </div>
+      <p class="survivors-line">함께 살아남은 참가자: 지훈, 2, 4, 민준</p>
+      <div class="result-actions">
+        <a class="btn btn-outline" data-component="Button" href="#match">다시 하기</a>
+        <a class="btn btn-primary" data-component="Button" id="newGameBtn" href="#setup">새 게임</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  const stage = document.querySelector('.sh-stage');
+  const screens = [...stage.querySelectorAll('[data-screen]')];
+  const screenSelect = document.getElementById('sh-screen');
+  const stateSelect = document.getElementById('sh-state');
+  const vpBtn = document.getElementById('sh-vp');
+  let current = null;
+  let currentStates = [];
+
+  screens.forEach(s => {
+    const option = document.createElement('option');
+    option.textContent = s.dataset.title || s.dataset.screen;
+    option.value = s.dataset.screen;
+    screenSelect.append(option);
+  });
+  screenSelect.onchange = () => show(screenSelect.value);
+
+  function show(slug) {
+    current = screens.find(s => s.dataset.screen === slug) || screens[0];
+    screens.forEach(s => s.hidden = s !== current);
+    screenSelect.value = current.dataset.screen;
+    history.replaceState(null, '', '#' + current.dataset.screen);
+    buildStates();
+  }
+
+  function buildStates() {
+    const declared = (current.dataset.states || '').split(',').map(x => x.trim()).filter(Boolean);
+    currentStates = ['Default', ...declared.filter(name => name !== 'Default')];
+    stateSelect.innerHTML = '';
+    currentStates.forEach(name => {
+      const option = document.createElement('option');
+      option.textContent = name;
+      option.value = name;
+      stateSelect.append(option);
+    });
+    applyState('Default');
+  }
+
+  function applyState(name) {
+    const active = currentStates.includes(name) ? name : 'Default';
+    current.querySelectorAll('[data-when]').forEach(el => {
+      const show = el.dataset.when.split(',').map(x => x.trim()).includes(active);
+      // Toggle the attribute directly rather than the .hidden IDL property: for
+      // SVG children, property assignment doesn't reliably reflect to/from the
+      // content attribute that the [hidden] CSS rule actually matches on.
+      if (show) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+    });
+    stateSelect.value = active;
+  }
+  stateSelect.onchange = () => applyState(stateSelect.value);
+
+  window.prototypeShell = {
+    showScreen: show,
+    setState: applyState,
+    getScreen: () => current?.dataset.screen,
+    getState: () => stateSelect.value
+  };
+
+  const VPS = ['full', '390', '768'];
+  let vp = VPS.find(v => document.body.classList.contains('sh-vp-' + v)) || 'full';
+  function applyVp() {
+    VPS.forEach(v => document.body.classList.toggle('sh-vp-' + v, v === vp && v !== 'full'));
+    vpBtn.textContent = 'vp: ' + vp + ' (m)';
+    vpBtn.classList.toggle('on', vp !== 'full');
+  }
+  vpBtn.onclick = () => { vp = VPS[(VPS.indexOf(vp) + 1) % VPS.length]; applyVp(); };
+  applyVp();
+
+  addEventListener('keydown', e => {
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    const i = screens.indexOf(current);
+    if (e.key === 'ArrowRight') show(screens[(i + 1) % screens.length].dataset.screen);
+    if (e.key === 'ArrowLeft') show(screens[(i - 1 + screens.length) % screens.length].dataset.screen);
+    if (e.key === 'm') vpBtn.click();
+  });
+
+  addEventListener('hashchange', () => show(location.hash.slice(1)));
+  show(location.hash.slice(1));
+
+  /* ── product interactions: setup screen ── */
+  const PALETTE = [
+    { hex: '#4E79A7', text: '#ffffff' },
+    { hex: '#F28E2B', text: '#ffffff' },
+    { hex: '#E15759', text: '#ffffff' },
+    { hex: '#59A14F', text: '#ffffff' },
+    { hex: '#EDC948', text: '#2b2b2b' },
+    { hex: '#B07AA1', text: '#ffffff' },
+    { hex: '#FF9DA7', text: '#2b2b2b' },
+    { hex: '#9C755F', text: '#ffffff' },
+  ];
+
+  function defaultParticipants(n) {
+    return Array.from({ length: n }, (_, i) => ({ name: String(i + 1), colorIndex: i }));
+  }
+
+  let participants = defaultParticipants(2);
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function renderRows() {
+    const list = document.getElementById('participantList');
+    list.innerHTML = '';
+    participants.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.className = 'participant-row';
+      const c = PALETTE[p.colorIndex];
+      row.innerHTML =
+        '<button type="button" class="row-color-btn" data-idx="' + i + '" style="background:' + c.hex + ';color:' + c.text + '" title="눌러서 다른 색상으로 바꾸기">' + (i + 1) + '</button>' +
+        '<input type="text" class="row-name-input" data-idx="' + i + '" value="' + escapeHtml(p.name) + '">';
+      list.appendChild(row);
+    });
+    list.querySelectorAll('.row-color-btn').forEach(btn => {
+      btn.onclick = () => cycleColor(Number(btn.dataset.idx));
+    });
+    list.querySelectorAll('.row-name-input').forEach(inp => {
+      inp.oninput = () => { participants[Number(inp.dataset.idx)].name = inp.value; };
+    });
+  }
+
+  // 참가자 수만큼의 색상은 항상 1인 1색으로 배정되어 있으므로, 다음 색상으로 넘길 때
+  // 그 색상을 이미 갖고 있던 참가자와 서로 맞바꾼다 (중복 색상이 생기지 않는다).
+  function cycleColor(rowIdx) {
+    const n = participants.length;
+    const next = (participants[rowIdx].colorIndex + 1) % n;
+    const otherIdx = participants.findIndex((p, i) => i !== rowIdx && p.colorIndex === next);
+    if (otherIdx !== -1) participants[otherIdx].colorIndex = participants[rowIdx].colorIndex;
+    participants[rowIdx].colorIndex = next;
+    renderRows();
+  }
+
+  const participantCountSelect = document.getElementById('participantCount');
+  const winnerCountSelect = document.getElementById('winnerCount');
+
+  function fillOptions(select, from, to, selected) {
+    select.innerHTML = '';
+    for (let v = from; v <= to; v++) {
+      const opt = document.createElement('option');
+      opt.value = String(v);
+      opt.textContent = v + '명';
+      select.appendChild(opt);
+    }
+    select.value = String(selected);
+  }
+
+  // 당첨자 수의 최대값은 항상 "참가자 수 - 1"이므로, 참가자 인원수를 바꿀 때마다
+  // 당첨자 수 콤보 박스의 선택지 자체를 다시 만든다(범위를 벗어난 값을 고를 수 없다).
+  function refreshWinnerOptions(keepValue) {
+    const count = Number(participantCountSelect.value);
+    const prevWinner = keepValue ? Number(winnerCountSelect.value) : 1;
+    fillOptions(winnerCountSelect, 1, count - 1, Math.min(prevWinner, count - 1));
+  }
+
+  function applyCount(n) {
+    const old = participants;
+    participants = Array.from({ length: n }, (_, i) => old[i] ? old[i] : { name: String(i + 1), colorIndex: i });
+    const seen = new Set();
+    participants.forEach((p, i) => {
+      if (p.colorIndex == null || p.colorIndex >= n || seen.has(p.colorIndex)) p.colorIndex = i;
+      seen.add(p.colorIndex);
+    });
+    renderRows();
+  }
+
+  fillOptions(participantCountSelect, 2, 8, 2);
+  refreshWinnerOptions(false);
+
+  participantCountSelect.addEventListener('change', () => {
+    refreshWinnerOptions(true);
+    applyCount(Number(participantCountSelect.value));
+  });
+  document.getElementById('startGameBtn').addEventListener('click', () => { location.hash = '#match'; });
+
+  function resetSetup() {
+    fillOptions(participantCountSelect, 2, 8, 2);
+    refreshWinnerOptions(false);
+    participants = defaultParticipants(2);
+    renderRows();
+  }
+  document.getElementById('newGameBtn').addEventListener('click', resetSetup);
+
+  renderRows();
+
+  /* ── product interactions: match screen ── */
+  const PARTICIPANTS = [
+    { name: '지훈', color: '#4E79A7', textColor: '#ffffff' },
+    { name: '2', color: '#F28E2B', textColor: '#ffffff' },
+    { name: '서연', color: '#E15759', textColor: '#ffffff' },
+    { name: '4', color: '#59A14F', textColor: '#ffffff' },
+    { name: '민준', color: '#EDC948', textColor: '#2b2b2b' },
+    { name: '6', color: '#B07AA1', textColor: '#ffffff' },
+  ];
+  const ELIMINATION_ORDER = [2, 5]; // 서연, 그다음 "6" — 결과 화면의 더미 데이터와 일치
+  const WINNER_COUNT = 2;
+  const CX = 340, CY = 320, R = 165;
+
+  let activeIdx = [];
+  let eliminatedCount = 0;
+  let elimInProgress = false;
+
+  function deg2rad(d) { return d * Math.PI / 180; }
+  function pt(angleDeg, radius) {
+    const r = deg2rad(angleDeg);
+    return { x: CX + radius * Math.cos(r), y: CY + radius * Math.sin(r) };
+  }
+
+  // 활성 참가자 수만큼 꼭짓점을 가진 정다각형의 꼭짓점 좌표.
+  function polygonVertices(n) {
+    return Array.from({ length: n }, (_, i) => pt(-90 + i * (360 / n), R));
+  }
+
+  // 탈락자를 뺀 남은 인원수에 맞춰 다각형을 다시 그린다. 골대는 도형의 꼭짓점(원형)이고,
+  // 각 변은 그 사이를 잇는 골 라인이며, 스틱(모서리가 둥근 사각형)이 그 변 위에서 방어한다.
+  function renderArena() {
+    const n = activeIdx.length;
+    const verts = polygonVertices(n);
+    let svg = '<polygon points="' + verts.map(v => v.x.toFixed(1) + ',' + v.y.toFixed(1)).join(' ') + '" fill="var(--muted)"/>';
+    activeIdx.forEach((pIdx, i) => {
+      const p = PARTICIPANTS[pIdx];
+      const v1 = verts[i], v2 = verts[(i + 1) % n];
+      const mx = (v1.x + v2.x) / 2, my = (v1.y + v2.y) / 2;
+      const edgeLen = Math.hypot(v2.x - v1.x, v2.y - v1.y);
+      const angleDeg = Math.atan2(v2.y - v1.y, v2.x - v1.x) * 180 / Math.PI;
+      svg += '<line x1="' + v1.x.toFixed(1) + '" y1="' + v1.y.toFixed(1) + '" x2="' + v2.x.toFixed(1) + '" y2="' + v2.y.toFixed(1) + '" stroke="var(--border)" stroke-width="2"/>';
+      const pw = edgeLen * 0.55, ph = 14;
+      svg += '<rect id="paddle-' + pIdx + '" x="' + (mx - pw / 2).toFixed(1) + '" y="' + (my - ph / 2).toFixed(1) + '" width="' + pw.toFixed(1) + '" height="' + ph + '" rx="7" fill="' + p.color + '" transform="rotate(' + angleDeg.toFixed(1) + ' ' + mx.toFixed(1) + ' ' + my.toFixed(1) + ')"/>';
+      const dx = mx - CX, dy = my - CY, dist = Math.hypot(dx, dy);
+      const lx = CX + dx / dist * (dist + 45), ly = CY + dy / dist * (dist + 45);
+      svg += '<rect id="labelbg-' + pIdx + '" x="' + (lx - 32).toFixed(1) + '" y="' + (ly - 13).toFixed(1) + '" width="64" height="26" rx="13" fill="' + p.color + '"/>';
+      svg += '<text id="labeltext-' + pIdx + '" x="' + lx.toFixed(1) + '" y="' + (ly + 5).toFixed(1) + '" text-anchor="middle" fill="' + p.textColor + '" font-size="14" font-weight="500">' + p.name + '</text>';
+    });
+    verts.forEach(v => {
+      svg += '<circle cx="' + v.x.toFixed(1) + '" cy="' + v.y.toFixed(1) + '" r="10" fill="var(--foreground)"/>';
+    });
+    document.getElementById('arenaGroup').innerHTML = svg;
+  }
+
+  // 탈락 애니메이션이 공을 보낼 위치 계산을 위해, 현재 다각형에서 특정 참가자
+  // 변의 중점을 다시 구한다(이미 renderArena가 그린 것과 같은 계산).
+  function currentEdgeMidpoint(pIdx) {
+    const n = activeIdx.length;
+    const verts = polygonVertices(n);
+    const i = activeIdx.indexOf(pIdx);
+    const v1 = verts[i], v2 = verts[(i + 1) % n];
+    return { x: (v1.x + v2.x) / 2, y: (v1.y + v2.y) / 2 };
+  }
+
+  function positionBall(x, y, trail) {
+    document.getElementById('ballTrail').setAttribute('d', trail);
+    document.getElementById('ball').setAttribute('cx', x);
+    document.getElementById('ball').setAttribute('cy', y);
+    document.getElementById('ballHighlight').setAttribute('cx', x - 3);
+    document.getElementById('ballHighlight').setAttribute('cy', y - 3);
+  }
+
+  function idleBallFor(round) {
+    const spots = [{ x: 310, y: 300 }, { x: 375, y: 345 }, { x: 300, y: 355 }];
+    const s = spots[round % spots.length];
+    return { x: s.x, y: s.y, trail: 'M' + CX + ',' + CY + ' Q' + ((CX + s.x) / 2) + ',' + ((CY + s.y) / 2) + ' ' + s.x + ',' + s.y };
+  }
+
+  function showToast(text) {
+    const toast = document.getElementById('elimToast');
+    toast.textContent = text;
+    toast.hidden = false;
+  }
+  function hideToast() {
+    document.getElementById('elimToast').hidden = true;
+  }
+  function updateRoundLabel() {
+    document.getElementById('roundLabel').textContent = (eliminatedCount + 1) + '판째 진행 중';
+  }
+  function retireChip(idx) {
+    const chip = document.getElementById('chip-' + idx);
+    chip.classList.add('is-eliminated');
+    chip.querySelector('.chip-name').style.textDecoration = 'line-through';
+  }
+  function reviveChip(idx) {
+    const chip = document.getElementById('chip-' + idx);
+    chip.classList.remove('is-eliminated');
+    chip.querySelector('.chip-name').style.textDecoration = 'none';
+  }
+
+  function resetMatch() {
+    activeIdx = PARTICIPANTS.map((_, i) => i);
+    eliminatedCount = 0;
+    elimInProgress = false;
+    PARTICIPANTS.forEach((_, i) => reviveChip(i));
+    renderArena();
+    const idle = idleBallFor(0);
+    positionBall(idle.x, idle.y, idle.trail);
+    hideToast();
+    updateRoundLabel();
+  }
+
+  // 탈락 순간은 이름에 취소선과 알림을 잠시 보여준 뒤, 탈락자를 아레나에서 완전히 빼고
+  // 남은 인원수에 맞게 다각형을 다시 나눠 그린다. 당첨자 수에 도달하면 결과 화면으로 넘어간다.
+  function runElimination() {
+    if (elimInProgress || eliminatedCount >= ELIMINATION_ORDER.length) return;
+    elimInProgress = true;
+    const target = ELIMINATION_ORDER[eliminatedCount];
+    const mid = currentEdgeMidpoint(target);
+    const dx = mid.x - CX, dy = mid.y - CY, dist = Math.hypot(dx, dy);
+    const bp = { x: CX + dx / dist * (dist + 16), y: CY + dy / dist * (dist + 16) };
+    positionBall(bp.x, bp.y, 'M' + CX + ',' + CY + ' Q' + ((CX + bp.x) / 2) + ',' + ((CY + bp.y) / 2) + ' ' + bp.x + ',' + bp.y);
+    showToast(PARTICIPANTS[target].name + ' 탈락');
+    const paddle = document.getElementById('paddle-' + target);
+    const labelText = document.getElementById('labeltext-' + target);
+    if (paddle) paddle.style.opacity = '0.25';
+    if (labelText) labelText.style.textDecoration = 'line-through';
+    retireChip(target);
+
+    setTimeout(() => {
+      hideToast();
+      activeIdx = activeIdx.filter(i => i !== target);
+      eliminatedCount++;
+      elimInProgress = false;
+      if (eliminatedCount >= WINNER_COUNT) {
+        location.hash = '#result';
+      } else {
+        renderArena();
+        const idle = idleBallFor(eliminatedCount);
+        positionBall(idle.x, idle.y, idle.trail);
+        updateRoundLabel();
+        prototypeShell.setState('Default');
+      }
+    }, 1500);
+  }
+
+  stateSelect.addEventListener('change', () => {
+    if (stateSelect.value === '탈락 순간') runElimination();
+  });
+
+  // 화면 선택, #hash 이동, 링크 클릭 등 진행 화면으로 들어오는 모든 경로를 한 곳에서 잡기
+  // 위해 셸이 화면 전환마다 여닫는 section의 hidden 속성 변화를 그대로 관찰한다.
+  new MutationObserver(() => {
+    if (!document.querySelector('[data-screen="match"]').hidden) resetMatch();
+  }).observe(document.querySelector('[data-screen="match"]'), { attributes: true, attributeFilter: ['hidden'] });
+
+  resetMatch();
+</script>
