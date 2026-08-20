@@ -6,7 +6,7 @@ import type { StickSpec } from "./stick";
 export const TARGET_DURATION_RANGE = [5, 10] as const;
 
 const BALL_RADIUS_RANGE = [0.035, 0.05] as const;
-const BALL_SPEED_RANGE = [0.06, 0.25] as const;
+const BALL_SPEED_RANGE = [0.3, 1.2] as const;
 const MAX_ATTEMPTS = 400;
 const MAX_SIM_SECONDS = 20;
 const YIELD_EVERY_N_ATTEMPTS = 16;

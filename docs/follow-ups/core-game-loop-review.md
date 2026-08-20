@@ -1,3 +1,6 @@
 - `components/game/useMatchSession.ts:65` planRound()의 실패(모든 시도 후에도 시작조건을 못 찾는 경우)가 `.catch` 없이 던져져, 발생 시 로딩 화면에 영구히 멈춘다. 실측 성공률(시도당 20~40%, 400회 시도) 상 발생 가능성은 매우 낮음.
 - `lib/game/setup.ts:43` `participantColors` 헬퍼가 어디서도 호출되지 않고, 같은 로직(`palette[p.colorIndex]`)이 ArenaView/ResultsScreen/SetupScreen 세 곳에 인라인으로 중복되어 있다. 헬퍼를 실제로 연결하거나 삭제할 것.
 - `lib/game/random.ts:22` `randomInt`가 export만 되어 있고 실제 호출부가 없다.
+- `lib/game/simulate.ts`의 스틱 충돌은 한 시뮬레이션 스텝(1/240초)을 8등분한 서브스텝으로 나누어 판정한다(연속 충돌 감지의 근사, 정확한 해석적 TOI는 아님). 500개 무작위 시드 기준 튕김의 약 1.8%에서 여전히 예상보다 큰(최대 0.13, 아레나 반지름=1 기준) 위치 보정이 관측된다 — 서브스텝을 늘리거나(`STICK_SUBSTEPS`) 해석적 연속 충돌 감지로 바꾸면 더 줄일 수 있으나 이번 범위 밖으로 남겨둔다.
+- `lib/game/simulate.ts`: 아레나 꼭짓점(골대) 근처에서 두 참가자의 스틱이 동시에 빠르게 연속 튕김을 일으키는 드문 경우, 공이 "변의 margin 제외 구간"과 "꼭짓점 판정 반경" 사이의 좁은 틈으로 빠져나가 탈락 판정 없이 아레나 밖으로 사라지는 버그를 500개 시드 중 1개(n=3, seed 120)에서 발견했다. margin과 vertexRadius가 경계를 완전히 빈틈없이 덮는다는 보장이 없어서 생기는 구조적 문제로 보이며, 코너 충돌 캐스케이드가 심할수록(특히 변이 적어 꼭짓점 내각이 좁은 n=3에서) 드러나기 쉽다. 재현 빈도가 매우 낮아(0.3%) 이번 범위 밖으로 남겨둔다.
+- `app/page.test.tsx`의 두 테스트가 `toBeInTheDocument`를 "Invalid Chai property"로 실패시킨다(jest-dom 매처가 vitest 설정에 등록되지 않음). 이번 세션의 게임 물리 변경과 무관한 기존 테스트 인프라 문제로 보인다.

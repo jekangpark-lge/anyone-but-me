@@ -5,18 +5,20 @@ import type { StickSpec } from "./stick";
 
 // 참가자 0: 골 라인 전체를 항상 덮는 스틱(절대 뚫리지 않음).
 const alwaysBlocks: StickSpec = {
-  topAngleDeg: 0,
   bottomLengthRatio: 1,
-  sideLengthRatio: 0.1,
+  angleBDeg: 90,
+  angleCDeg: 90,
+  angleDDeg: 90,
   speed: 0,
   phaseOffset: 0,
 };
 
 // 참가자 1: 변의 맨 끝(골대 쪽)에 붙어 거의 아무것도 막지 못하는 스틱.
 const barelyBlocks: StickSpec = {
-  topAngleDeg: 0,
   bottomLengthRatio: 0.001,
-  sideLengthRatio: 0.06,
+  angleBDeg: 90,
+  angleCDeg: 90,
+  angleDDeg: 90,
   speed: 0,
   phaseOffset: 0,
 };
