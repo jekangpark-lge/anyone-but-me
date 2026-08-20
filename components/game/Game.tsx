@@ -50,7 +50,6 @@ export function Game() {
       <ResultsScreen
         participants={session.participants}
         eliminatedOrder={session.eliminatedOrder}
-        winnersCount={session.winnersCount}
         onReplay={() => match.start(session.participants, session.winnersCount)}
         onNewGame={() => {
           match.reset();
